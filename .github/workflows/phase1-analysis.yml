@@ -40,7 +40,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python scripts/run_phase1_analysis.py
+          python scripts/run_phase1_analysis.py &> transform_analysis.log
       
       - name: Upload analysis results
         uses: actions/upload-artifact@v4
@@ -48,3 +48,11 @@ jobs:
           name: analysis-results
           path: repos/
           retention-days: 30
+      
+      - name: Upload Transform logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: transform-logs
+          path: transform_analysis.log
+          if-no-files-found: warn
