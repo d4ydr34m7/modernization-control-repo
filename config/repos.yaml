@@ -1,0 +1,16 @@
+mode: single   # single | org_scan
+
+single:
+  name: legacy-java-demo
+  git_url: https://github.com/d4ydr34m7/transform-legacy-demo.git
+
+org_scan:
+  github_org: d4ydr34m7
+
+  filters:
+    language: java
+    exclude_archived: true
+    exclude_forks: true
+
+  limits:
+    max_repos_per_run: 1
