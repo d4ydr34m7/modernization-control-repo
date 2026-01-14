@@ -42,16 +42,21 @@ jobs:
         run: |
           python scripts/run_phase1_analysis.py
       
+      - name: Collect ATX artifacts and logs
+        if: always()
+        run: |
+          mkdir -p atx-artifacts
+          if [ -d ~/.aws/atx ]; then
+            cp -r ~/.aws/atx atx-artifacts/ || true
+          fi
+        continue-on-error: true
+      
       - name: Upload ATX artifacts and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: atx-logs-and-artifacts
-          path: |
-            ~/.aws/atx/custom/**/logs/*.log
-            ~/.aws/atx/custom/**/artifacts/validation_summary.md
-            ~/.aws/atx/custom/**/artifacts/git_instructions.md
-            ~/.aws/atx/logs/*.log
+          path: atx-artifacts/
           retention-days: 7
         continue-on-error: true
       
