@@ -32,8 +32,8 @@ To use `org_scan` mode, you need a GitHub Personal Access Token:
    - **Note:** Give it a descriptive name like "repo-scanner" or "modernization-control-repo"
    - **Expiration:** Choose an expiration (90 days, 1 year, or no expiration)
    - **Scopes:** Check the following permissions:
-     - ✅ `read:org` - Required to read organization repositories
-     - ✅ `repo` - Required if you want to access private repositories (optional but recommended)
+     - `read:org` - Required to read organization repositories
+     - `repo` - Required if you want to access private repositories (optional but recommended)
    
    **Step 4:** Generate and copy
    - Scroll down and click the green "Generate token" button
