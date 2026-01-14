@@ -90,10 +90,7 @@ def main():
     
     # Discover repositories to analyze
     repos = discover_repos()
-    if len(repos) == 1:
-        print(f"Found 1 repository to analyze")
-    else:
-        print(f"Found {len(repos)} repositories to analyze")
+    print(f"Found {len(repos)} repository(ies) to analyze")
     
     # Mark all discovered repos as pending initially
     for repo in repos:
@@ -224,10 +221,7 @@ def main():
                 print(f"Cleanup complete")
     
     print(f"\n{'='*60}")
-    if len(repos) == 1:
-        print(f"Phase 1 analysis complete for 1 repository")
-    else:
-        print(f"Phase 1 analysis complete for {len(repos)} repositories")
+    print(f"Phase 1 analysis complete for {len(repos)} repository(ies)")
     print(f"{'='*60}")
 
 
