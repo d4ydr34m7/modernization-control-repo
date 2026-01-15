@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """
-Phase 1 Analysis Script
-
-Automated workflow for AWS Transform analysis on discovered repositories.
-Clones repos, runs Transform analysis automatically, then saves results.
+Phase 1 Analysis Script - OPTIMIZED FOR CI/CD
+Automated workflow for AWS Transform analysis.
+UPDATED: Streams output to file to prevent GitHub Actions buffer overflow crashes.
 """
 
 import subprocess
@@ -140,21 +139,31 @@ def main():
             transformation_name = "AWS/early-access-comprehensive-codebase-analysis"
             print(f"\nRunning Transform analysis on {repo_name}")
             print(f"Using transformation: {transformation_name}")
-            subprocess.run(
-                [
-                    "atx", "custom", "def", "exec",
-                    "-n", transformation_name,
-                    "-p", str(clone_path),
-                    "-x",  # Non-interactive mode
-                    "-t"   # Trust all tools
-                ],
-                check=True,
-                cwd=str(clone_path)
-            )
-            print(f"Transform analysis completed")
+            
+            # Define log file path (bypasses console buffer to prevent CI crashes)
+            log_file_path = repos_dir / f"{repo_name}_transform.log"
+            print(f"Streaming output to {log_file_path.name} to prevent CI buffer overflow...")
+            
+            # Stream output directly to disk (bypasses shell pipe buffer)
+            with open(log_file_path, "w") as log_file:
+                subprocess.run(
+                    [
+                        "atx", "custom", "def", "exec",
+                        "-n", transformation_name,
+                        "-p", str(clone_path),
+                        "-x",  # Non-interactive mode
+                        "-t"   # Trust all tools
+                    ],
+                    check=True,
+                    cwd=str(clone_path),
+                    stdout=log_file,          # Direct stream to disk (no RAM buffer)
+                    stderr=subprocess.STDOUT  # Merge errors into same file
+                )
+            
+            print(f"Transform analysis completed. Logs saved to {log_file_path.name}")
             
             # Copy analysis output from cloned repo to analysis directory
-            print(f"\nCopying Transform-generated output from {clone_path} to {analysis_output_dir}")
+            print(f"\nCopying Transform-generated output...")
             
             # Transform-generated folders to copy
             transform_output_folders = [
@@ -166,30 +175,22 @@ def main():
             ]
             
             if clone_path.exists():
-                copied_anything = False
-                # Copy only Transform-generated folders
+                copied_count = 0
                 for item in clone_path.iterdir():
-                    # Skip .git and source code directories
                     if item.name == ".git":
                         continue
                     
-                    # Copy if it matches Transform output patterns
                     if item.name in transform_output_folders or item.name.startswith(".aws"):
                         dest_item = analysis_output_dir / item.name
                         if item.is_dir():
                             shutil.copytree(item, dest_item, dirs_exist_ok=True)
-                            print(f"Copied {item.name}/")
-                            copied_anything = True
                         else:
                             shutil.copy2(item, dest_item)
-                            print(f"Copied {item.name}")
-                            copied_anything = True
+                        copied_count += 1
+                        print(f"Copied {item.name}/")
                 
-                if not copied_anything:
-                    print(f"Warning: No Transform output folders found in {clone_path}")
-                    print(f"Expected folders: {', '.join(transform_output_folders)}")
-            
-            print(f"Transform output copied to {analysis_output_dir}")
+                if copied_count == 0:
+                    print(f"Warning: No standard output folders found. Check the log file.")
             
             # Update registry: mark as analyzed
             registry_data = update_registry_entry(
@@ -201,10 +202,9 @@ def main():
             )
             save_registry(registry_path, registry_data)
             
-        except subprocess.CalledProcessError as e:
-            print(f"\nError: Failed to process {repo_name}", file=sys.stderr)
-            if e.stderr:
-                print(f"{e.stderr}", file=sys.stderr)
+        except subprocess.CalledProcessError:
+            # Note: Error details are already in the log file (stderr merged with stdout)
+            print(f"\nError: Failed to process {repo_name}. Check {repos_dir.name}/{repo_name}_transform.log", file=sys.stderr)
             sys.exit(1)
         except Exception as e:
             print(f"\nError: Unexpected error processing {repo_name}: {e}", file=sys.stderr)

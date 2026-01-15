@@ -40,7 +40,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python scripts/run_phase1_analysis.py &> transform_analysis.log
+          # Python script now handles logging to file internally to prevent buffer crashes
+          python scripts/run_phase1_analysis.py
       
       - name: Upload analysis results
         uses: actions/upload-artifact@v4
@@ -54,5 +55,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: transform-logs
-          path: transform_analysis.log
+          # Matches the log files created by the python script (e.g., legacy-java-demo_transform.log)
+          path: repos/*.log
           if-no-files-found: warn
