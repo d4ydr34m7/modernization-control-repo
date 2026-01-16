@@ -1,5 +1,20 @@
 name: Phase 1 Analysis
 
+# CONTROL-PLANE WORKFLOW (Orchestration and artifact management only)
+# 
+# ARCHITECTURE SEPARATION:
+#   - Control-plane: This workflow (GitHub Actions) - artifact upload and status tracking
+#   - Execution-plane: run_phase1_analysis.py (stable runners) - Transform execution
+#
+# AWS Transform is intentionally NOT executed here due to:
+#   - Large, stateful output requiring persistent storage
+#   - ATX early-access instability in ephemeral CI runners
+#   - Long execution times (1-2+ hours) requiring human oversight
+#
+# This workflow handles artifact upload after execution completes on stable runners.
+# Repository discovery and Transform execution happen when run_phase1_analysis.py
+# is executed on a stable runner (IDE/Codespaces/EC2).
+
 on:
   workflow_dispatch:  # Manual trigger button in GitHub Actions UI
   schedule:
@@ -9,7 +24,7 @@ on:
       - 'config/repos.yaml'  # Trigger when config changes
 
 jobs:
-  analyze:
+  orchestrate:
     runs-on: ubuntu-latest
     
     steps:
@@ -25,36 +40,24 @@ jobs:
         run: |
           pip install -r requirements.txt
       
-      - name: Install AWS Transform CLI
-        run: |
-          curl -fsSL https://desktop-release.transform.us-east-1.api.aws/install.sh | bash
-      
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-      
-      - name: Run Phase 1 Analysis
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          # Python script now handles logging to file internally to prevent buffer crashes
-          python scripts/run_phase1_analysis.py
+      # NOTE: AWS Transform CLI and credentials are NOT installed here
+      # Transform execution happens on stable runners (IDE/Codespaces/EC2)
+      # This workflow only handles artifact upload after execution completes
       
       - name: Upload analysis results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: analysis-results
           path: repos/
           retention-days: 30
+          if-no-files-found: warn
       
       - name: Upload Transform logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: transform-logs
-          # Matches the log files created by the python script (e.g., legacy-java-demo_transform.log)
+          # Matches log files from stable-runner execution (e.g., legacy-java-demo_transform.log)
           path: repos/*.log
           if-no-files-found: warn

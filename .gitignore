@@ -50,6 +50,9 @@ build/
 config/local.yaml
 config/*.local.yaml
 
-# Analysis artifacts
+# Analysis artifacts and generated outputs
 tmp/
-repos/
+
+# Repos directory: ignore all analysis outputs but keep registry file
+repos/*
+!repos/analysis_registry.yaml

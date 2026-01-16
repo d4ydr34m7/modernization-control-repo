@@ -1,8 +1,28 @@
 #!/usr/bin/env python3
 """
-Phase 1 Analysis Script - OPTIMIZED FOR CI/CD
-Automated workflow for AWS Transform analysis.
-UPDATED: Streams output to file to prevent GitHub Actions buffer overflow crashes.
+Phase 1 Analysis Script - STABLE-RUNNER EXECUTION ONLY
+
+This script executes AWS Transform analysis on discovered repositories.
+EXECUTION CONTEXT: Intended for stable, long-running environments:
+  - Local development (IDE)
+  - GitHub Codespaces
+  - EC2 instances
+  - NOT for ephemeral CI/CD runners
+
+ARCHITECTURE:
+  - Control-plane: GitHub Actions (orchestration, artifact upload)
+  - Execution-plane: This script (Transform execution on stable runners)
+  
+AWS Transform is intentionally NOT executed in CI due to:
+  - Large, stateful output that requires persistent storage
+  - ATX early-access instability in ephemeral runners
+  - Long execution times (1-2+ hours) requiring human oversight
+
+STATUS TRACKING:
+  - pending: Repository discovered, not started
+  - running: Transform execution started
+  - analyzed: Transform completed successfully
+  - failed: Transform execution failed
 """
 
 import subprocess
@@ -34,7 +54,11 @@ def save_registry(registry_path, registry_data):
 
 
 def update_registry_entry(registry_data, repo_name, git_url, status, language="unknown", notes=None):
-    """Update or create an entry in the registry."""
+    """
+    Update or create an entry in the registry.
+    
+    Valid statuses: pending, running, analyzed, failed
+    """
     repos = registry_data.setdefault("repos", [])
     
     # Find existing entry
@@ -120,10 +144,19 @@ def main():
         try:
             # Clean up any existing clone directory from previous runs
             if clone_path.exists():
-                subprocess.run(
-                    ["rm", "-rf", str(clone_path)],
-                    check=True
-                )
+                # Use shutil.rmtree which handles permission issues better than rm -rf
+                try:
+                    shutil.rmtree(clone_path)
+                except PermissionError:
+                    # If permission denied, try with chmod first
+                    import stat
+                    import os
+                    for root, dirs, files in os.walk(clone_path):
+                        for d in dirs:
+                            os.chmod(os.path.join(root, d), stat.S_IRWXU)
+                        for f in files:
+                            os.chmod(os.path.join(root, f), stat.S_IRWXU)
+                    shutil.rmtree(clone_path)
             
             # Clone the repository
             print(f"\nCloning {repo_url} to {clone_path}")
@@ -135,14 +168,25 @@ def main():
             )
             print(f"Repository cloned successfully")
             
+            # Mark repository as running before Transform execution
+            registry_data = update_registry_entry(
+                registry_data,
+                repo_name,
+                repo_url,
+                "running",
+                language="unknown"
+            )
+            save_registry(registry_path, registry_data)
+            
             # Run Transform analysis in non-interactive mode
+            # EXECUTION-PLANE: This is the heavy Transform execution (stable-runner only)
             transformation_name = "AWS/early-access-comprehensive-codebase-analysis"
             print(f"\nRunning Transform analysis on {repo_name}")
             print(f"Using transformation: {transformation_name}")
             
-            # Define log file path (bypasses console buffer to prevent CI crashes)
+            # Define log file path for Transform output
             log_file_path = repos_dir / f"{repo_name}_transform.log"
-            print(f"Streaming output to {log_file_path.name} to prevent CI buffer overflow...")
+            print(f"Streaming output to {log_file_path.name}...")
             
             # Stream output directly to disk (bypasses shell pipe buffer)
             with open(log_file_path, "w") as log_file:
@@ -192,7 +236,7 @@ def main():
                 if copied_count == 0:
                     print(f"Warning: No standard output folders found. Check the log file.")
             
-            # Update registry: mark as analyzed
+            # Update registry: mark as analyzed (successful completion)
             registry_data = update_registry_entry(
                 registry_data,
                 repo_name,
@@ -203,10 +247,30 @@ def main():
             save_registry(registry_path, registry_data)
             
         except subprocess.CalledProcessError:
+            # Transform execution failed - mark as failed and keep logs
+            registry_data = update_registry_entry(
+                registry_data,
+                repo_name,
+                repo_url,
+                "failed",
+                language="unknown",
+                notes=f"Transform execution failed. Check {repos_dir.name}/{repo_name}_transform.log"
+            )
+            save_registry(registry_path, registry_data)
             # Note: Error details are already in the log file (stderr merged with stdout)
             print(f"\nError: Failed to process {repo_name}. Check {repos_dir.name}/{repo_name}_transform.log", file=sys.stderr)
             sys.exit(1)
         except Exception as e:
+            # Unexpected error - mark as failed
+            registry_data = update_registry_entry(
+                registry_data,
+                repo_name,
+                repo_url,
+                "failed",
+                language="unknown",
+                notes=f"Unexpected error: {str(e)}"
+            )
+            save_registry(registry_path, registry_data)
             print(f"\nError: Unexpected error processing {repo_name}: {e}", file=sys.stderr)
             sys.exit(1)
             
@@ -214,11 +278,14 @@ def main():
             # Delete the cloned repository after copying
             if clone_path.exists():
                 print(f"\nDeleting cloned repository at {clone_path}")
-                subprocess.run(
-                    ["rm", "-rf", str(clone_path)],
-                    check=True
-                )
-                print(f"Cleanup complete")
+                try:
+                    # Use shutil.rmtree which handles permission issues better
+                    shutil.rmtree(clone_path)
+                    print(f"Cleanup complete")
+                except (PermissionError, OSError) as e:
+                    # If cleanup fails, log warning but don't fail the script
+                    print(f"Warning: Could not fully delete {clone_path}: {e}", file=sys.stderr)
+                    print(f"Cleanup partial - some files may remain")
     
     print(f"\n{'='*60}")
     print(f"Phase 1 analysis complete for {len(repos)} repository(ies)")
