@@ -23,7 +23,8 @@ name: Phase 1 Analysis
 on:
   workflow_dispatch:  # Manual trigger button in GitHub Actions UI
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC (optional)
+    # TEMP: 5-minute schedule for testing. Will revert to weekly after validation.
+    - cron: '*/5 * * * *'
   push:
     paths:
       - 'config/repos.yaml'  # Trigger when config changes
@@ -69,8 +70,10 @@ jobs:
         env:
           # Use custom token if available (required for org_scan mode with read:org permission)
           # Otherwise falls back to default GITHUB_TOKEN (may not have org read permissions)
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN_CUSTOM || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN_CUSTOM: ${{ secrets.GITHUB_TOKEN_CUSTOM }}
+          GITHUB_TOKEN_DEFAULT: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          export GITHUB_TOKEN="${GITHUB_TOKEN_CUSTOM:-$GITHUB_TOKEN_DEFAULT}"
           python scripts/run_phase1_analysis.py
       
       - name: Upload analysis results
