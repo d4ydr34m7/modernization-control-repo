@@ -1,6 +1,28 @@
 # Modernization Control Repo
 
-Repository discovery tool for scanning GitHub organizations.
+Automated AWS Transform analysis for codebase modernization. Discovers repositories and executes comprehensive codebase analysis using AWS Transform on stable execution environments.
+
+## Architecture
+
+**Control-Plane vs Execution-Plane Separation:**
+- **Control-plane**: GitHub Actions workflow - orchestration and artifact management
+- **Execution-plane**: Self-hosted runner (EC2 / long-lived machine) - Transform execution
+
+**Execution Requirements:**
+- Execution requires a self-hosted runner that is:
+  - **Always on** (or automatically started before scheduled runs)
+  - **Long-running** (not subject to CI timeout limits)
+  - **Not subject to CI payload limits** (persistent storage for large outputs)
+- AWS Transform is **NOT** executed in ephemeral CI/CD runners due to:
+  - Large, stateful output requiring persistent storage
+  - ATX early-access instability in ephemeral runners
+  - Long execution times (1-2+ hours) requiring stable execution environment
+
+**Status Tracking:**
+- `pending`: Repository discovered, not started
+- `running`: Transform execution started
+- `analyzed`: Transform completed successfully (output-aware detection)
+- `failed`: Transform execution failed
 
 ## Setup
 
@@ -64,11 +86,68 @@ To use `org_scan` mode, you need a GitHub Personal Access Token:
    - The `.gitignore` file is configured to exclude `.env` files
    - The `.env` file is the recommended secure storage method
 
+### 3. AWS Credentials Setup
+
+**For Self-Hosted Runner (EC2 / Long-lived Machine):**
+
+**Option A: AWS SSO (Recommended)**
+```bash
+# Install AWS CLI (if not already installed)
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip && sudo ./aws/install
+
+# Configure SSO
+aws configure sso
+# Follow prompts: SSO start URL, region, profile name
+
+# Login when needed
+aws sso login
+```
+
+**Option B: Environment Variables**
+1. Set environment variables on the self-hosted runner:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_DEFAULT_REGION`
+2. Configure AWS CLI to use them:
+```bash
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+EOF
+
+cat > ~/.aws/config << EOF
+[default]
+region = ${AWS_DEFAULT_REGION:-us-east-1}
+EOF
+```
+
+**For Local Development (Testing Only):**
+```bash
+# Use AWS SSO or configure credentials
+aws configure
+# Or use AWS SSO as shown above
+```
+
+### 4. Install AWS Transform CLI
+
+```bash
+# Install ATX CLI
+curl -fsSL https://desktop-release.transform.us-east-1.api.aws/install.sh | bash
+
+# Verify installation
+atx --version
+```
+
 ## Usage
 
 ### Running Phase 1 Analysis
 
-#### Local Execution
+**Important:** This script must run on a self-hosted runner (EC2 / long-lived machine). Local development (IDE) is for testing only. NOT for ephemeral CI/CD runners.
+
+#### Configuration
 
 Edit `config/repos.yaml` to configure which repositories to analyze:
 
@@ -95,38 +174,100 @@ org_scan:
     max_repos_per_run: 3
 ```
 
-Run the analysis script:
+#### Execution
+
+**Basic usage (idempotent - skips already analyzed repos):**
 ```bash
 source venv/bin/activate
 python scripts/run_phase1_analysis.py
 ```
 
+**Force re-analysis:**
+```bash
+python scripts/run_phase1_analysis.py --force
+```
+
 The script will:
 1. Discover repositories from `config/repos.yaml`
-2. Clone each repository to `tmp/`
-3. Run AWS Transform analysis automatically
-4. Copy Transform output to `repos/<repo-name>/analysis/`
-5. Update the registry at `repos/analysis_registry.yaml`
-6. Clean up cloned repositories
+2. **Skip repos already marked as `analyzed`** (idempotent by default)
+3. Clone each repository to `tmp/`
+4. Mark repo status as `running`
+5. Run AWS Transform analysis (output-aware: preserves results even if process errors)
+6. Detect success via multiple indicators (log messages + output folders)
+7. Copy Transform output to `repos/<repo-name>/analysis/`
+8. Update registry status (`analyzed` or `failed`)
+9. Clean up cloned repositories
 
-#### CI/CD Execution (GitHub Actions)
+**Output Location:**
+- Analysis results: `repos/<repo-name>/analysis/`
+- Logs: `repos/<repo-name>_transform.log`
+- Registry: `repos/analysis_registry.yaml`
 
-The repository includes a GitHub Actions workflow that runs Phase 1 analysis automatically.
+#### Idempotent Behavior
 
-**Setup:**
-1. Add AWS credentials as GitHub Secrets:
-   - Go to Repository → Settings → Secrets and variables → Actions
-   - Click "New repository secret"
-   - Add `AWS_ACCESS_KEY_ID` with your AWS access key
-   - Add `AWS_SECRET_ACCESS_KEY` with your AWS secret key
+- **Default**: Repos with `analysis_status: "analyzed"` are automatically skipped
+- **Override**: Use `--force` flag to re-analyze already analyzed repos
+- **Re-runs**: Repos with status `pending`, `running`, or `failed` are always included
 
-2. Push code to GitHub (workflow file is already included)
+#### Success Detection
+
+The script uses **output-aware success detection** (not just exit codes):
+- Checks log file for "successfully completed with all exit criteria met"
+- Validates multiple output folders exist (Documentation, .aws, etc.)
+- Preserves outputs even if Transform process exits with error
+- Marks as `analyzed` if outputs/logs indicate success, regardless of exit code
+
+### GitHub Actions Workflow (Self-Hosted Runner)
+
+**Architecture:**
+- **Control-plane**: GitHub Actions (orchestration, artifact upload)
+- **Execution-plane**: Self-hosted runner (EC2 / long-lived machine)
+
+The GitHub Actions workflow (`phase1-analysis.yml`) executes Phase 1 analysis on a **self-hosted runner** (EC2 / long-lived machine), then uploads results as artifacts.
+
+The self-hosted runner must be:
+- **Always on** (or automatically started before scheduled runs)
+- **Long-running** (not subject to CI timeout limits)
+- **Not subject to CI payload limits** (persistent storage for large outputs)
+
+**Prerequisites on self-hosted runner:**
+1. **Install AWS Transform CLI:**
+   ```bash
+   curl -fsSL https://desktop-release.transform.us-east-1.api.aws/install.sh | bash
+   ```
+
+2. **Configure AWS credentials** (choose one):
+   - **AWS SSO** (recommended):
+     ```bash
+     aws configure sso
+     aws sso login
+     ```
+   - **Environment variables**:
+     - Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_DEFAULT_REGION` on the runner
+     - Configure AWS CLI to use them (see Setup section above)
+
+3. **Install GitHub Actions runner:**
+   ```bash
+   # Download and install runner (follow GitHub's self-hosted runner setup guide)
+   # Runner must be running and registered with your repository
+   ```
+
+4. **GitHub Token (for org_scan mode):**
+   - Add `GITHUB_TOKEN_CUSTOM` secret to repository (PAT with `read:org` permission)
+   - Or ensure default `GITHUB_TOKEN` has required permissions
+
+**What the workflow does:**
+- Executes `run_phase1_analysis.py` on the self-hosted runner
+- Verifies AWS Transform CLI and credentials are configured
+- Runs Transform analysis (scheduled or manual trigger)
+- Uploads analysis results and logs as artifacts
 
 **Triggers:**
-- Manual trigger: Go to Actions tab → "Phase 1 Analysis" → "Run workflow"
-- Weekly schedule: Runs every Sunday at midnight UTC
-- Config changes: Automatically runs when `config/repos.yaml` is updated
+- **Manual trigger**: Actions → "Phase 1 Analysis" → "Run workflow"
+- **Scheduled**: Weekly on Sunday at midnight UTC (cron: `0 0 * * 0`)
+- **Automatic**: When `config/repos.yaml` is updated
 
 **Results:**
-- Analysis results are uploaded as artifacts (retained for 30 days)
-- Registry updates are saved in the workflow run
+- Analysis results uploaded as artifacts (retained for 30 days)
+- Logs available for download
+- Registry updated with analysis status

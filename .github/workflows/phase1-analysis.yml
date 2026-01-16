@@ -1,19 +1,24 @@
 name: Phase 1 Analysis
 
-# CONTROL-PLANE WORKFLOW (Orchestration and artifact management only)
+# SELF-HOSTED RUNNER EXECUTION (EC2 / Long-lived Machine)
 # 
-# ARCHITECTURE SEPARATION:
-#   - Control-plane: This workflow (GitHub Actions) - artifact upload and status tracking
-#   - Execution-plane: run_phase1_analysis.py (stable runners) - Transform execution
+# ARCHITECTURE:
+#   - Control-plane: GitHub Actions (orchestration, artifact upload)
+#   - Execution-plane: Self-hosted runner (EC2 / long-lived machine)
 #
-# AWS Transform is intentionally NOT executed here due to:
-#   - Large, stateful output requiring persistent storage
-#   - ATX early-access instability in ephemeral CI runners
-#   - Long execution times (1-2+ hours) requiring human oversight
+# The self-hosted runner must be:
+#   - Always on (or automatically started before scheduled runs)
+#   - Long-running (not ephemeral like GitHub-hosted runners)
+#   - Not subject to CI payload limits (persistent storage for large outputs)
 #
-# This workflow handles artifact upload after execution completes on stable runners.
-# Repository discovery and Transform execution happen when run_phase1_analysis.py
-# is executed on a stable runner (IDE/Codespaces/EC2).
+# PREREQUISITES on self-hosted runner:
+#   - AWS Transform CLI installed and configured
+#   - AWS credentials configured (SSO or environment variables)
+#   - Python 3.11+ available
+#   - GitHub Actions runner agent installed and running
+#
+# This workflow executes run_phase1_analysis.py on the self-hosted runner,
+# then uploads analysis results and logs as artifacts.
 
 on:
   workflow_dispatch:  # Manual trigger button in GitHub Actions UI
@@ -24,8 +29,8 @@ on:
       - 'config/repos.yaml'  # Trigger when config changes
 
 jobs:
-  orchestrate:
-    runs-on: ubuntu-latest
+  analyze:
+    runs-on: self-hosted
     
     steps:
       - name: Checkout code
@@ -40,9 +45,33 @@ jobs:
         run: |
           pip install -r requirements.txt
       
-      # NOTE: AWS Transform CLI and credentials are NOT installed here
-      # Transform execution happens on stable runners (IDE/Codespaces/EC2)
-      # This workflow only handles artifact upload after execution completes
+      - name: Verify AWS Transform CLI
+        run: |
+          if ! command -v atx &> /dev/null; then
+            echo "Error: AWS Transform CLI (atx) not found. Install it first:"
+            echo "  curl -fsSL https://desktop-release.transform.us-east-1.api.aws/install.sh | bash"
+            exit 1
+          fi
+          atx --version
+      
+      - name: Verify AWS credentials
+        run: |
+          # Check if AWS credentials are configured
+          if ! aws sts get-caller-identity &> /dev/null; then
+            echo "Warning: AWS credentials not configured. Analysis may fail."
+            echo "Configure credentials using: aws configure sso"
+          else
+            echo "AWS credentials verified"
+            aws sts get-caller-identity
+          fi
+      
+      - name: Run Phase 1 Analysis
+        env:
+          # Use custom token if available (required for org_scan mode with read:org permission)
+          # Otherwise falls back to default GITHUB_TOKEN (may not have org read permissions)
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN_CUSTOM || secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/run_phase1_analysis.py
       
       - name: Upload analysis results
         if: always()
@@ -58,6 +87,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: transform-logs
-          # Matches log files from stable-runner execution (e.g., legacy-java-demo_transform.log)
+          # Matches log files from analysis execution (e.g., legacy-java-demo_transform.log)
           path: repos/*.log
           if-no-files-found: warn
