@@ -53,6 +53,6 @@ config/*.local.yaml
 # Analysis artifacts and generated outputs
 tmp/
 
-# Repos directory: ignore all analysis outputs but keep registry file
-repos/*
-!repos/analysis_registry.yaml
+# Repos directory: commit analysis outputs but exclude logs
+# Logs are uploaded as artifacts but never committed
+repos/**/*.log

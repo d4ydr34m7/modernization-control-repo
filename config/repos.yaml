@@ -1,13 +1,13 @@
 mode: single   # single | org_scan
 
 single:
-  name: legacy-java-demo
-  git_url: https://github.com/d4ydr34m7/transform-legacy-demo.git
+  name: verafin-transform
+  git_url: https://github.com/d4ydr34m7/verafin-transform.git
 
 org_scan:
   github_org: d4ydr34m7
 
-  filters:
+  filters:  
     language: java
     exclude_archived: true
     exclude_forks: true
