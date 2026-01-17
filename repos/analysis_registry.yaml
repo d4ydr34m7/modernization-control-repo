@@ -2,6 +2,8 @@ repos:
 - repo_name: legacy-java-demo
   git_url: https://github.com/d4ydr34m7/transform-legacy-demo.git
   language: unknown
-  analysis_status: running
-  analysis_date: '2026-01-15T02:25:48.427704'
-  notes: Transform execution failed. Check repos/legacy-java-demo_transform.log
+  analysis_status: analyzed
+  analysis_date: '2026-01-16T23:37:33.548590'
+  notes: 'Analysis completed (confidence: medium). Outputs: Documentation | Log confirms
+    successful completion | Process exit code indicated error, but outputs confirm
+    success'
