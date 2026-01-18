@@ -1,0 +1,84 @@
+Data Flow Diagram - Query Result Transformation
+================================================
+
+DATABASE LAYER
+    |
+    | SELECT id, email, status FROM users WHERE id = 'u-123'
+    |
+    v
+RESULT SET (Database format)
+    |
+    | Row: { id: "u-123", email: "user@example.com", status: "ACTIVE" }
+    |
+    v
+[LegacyJdoManager.executeQuery()]
+    |
+    | Transform to List<Map<String, Object>>
+    |
+    v
+MAP REPRESENTATION
+    |
+    | List<Map<String, Object>> rows = [
+    |   {
+    |     "id" -> "u-123",
+    |     "email" -> "user@example.com",
+    |     "status" -> "ACTIVE"
+    |   }
+    | ]
+    |
+    v
+[Return to UserDao]
+    |
+    | UserDao.findById() receives rows
+    |
+    v
+NULL CHECK
+    |
+    | if (rows.isEmpty()) return null;
+    |
+    +-- Empty --> return null
+    |
+    +-- Not Empty
+         |
+         v
+    EXTRACT FIRST ROW
+         |
+         | Map<String, Object> r = rows.get(0);
+         |
+         v
+    TRANSFORM TO DOMAIN MODEL
+         |
+         | new UserRecord(
+         |   String.valueOf(r.get("id")),      // "u-123"
+         |   String.valueOf(r.get("email")),   // "user@example.com"
+         |   String.valueOf(r.get("status"))   // "ACTIVE"
+         | )
+         |
+         v
+    TYPED DOMAIN OBJECT
+         |
+         | UserRecord { id, email, status }
+         |
+         v
+    [Return to Service]
+
+DATA TYPE FLOW:
+===============
+Database Row (SQL types)
+    |
+    v
+Map<String, Object> (type-erased)
+    |
+    v
+String.valueOf() conversion
+    |
+    v
+UserRecord (typed, immutable)
+
+TRANSFORMATIONS:
+================
+1. DB row     -> Map (column name -> value)
+2. Map values -> String (String.valueOf)
+3. Strings    -> UserRecord (constructor)
+
+ISSUE: Manual mapping, no ORM, type unsafe intermediate

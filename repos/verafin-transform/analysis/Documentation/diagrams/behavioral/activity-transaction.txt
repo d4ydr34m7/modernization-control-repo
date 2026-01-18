@@ -1,0 +1,64 @@
+Activity Diagram - Transaction Management
+==========================================
+
+                    [START]
+                       |
+                       v
+            +--------------------+
+            |  manager.begin()   |
+            |  State: TX = OPEN  |
+            +--------------------+
+                       |
+                       v
+            +--------------------+
+            | Execute Operations |
+            | (Query/Update)     |
+            +--------------------+
+                       |
+              +--------+--------+
+              |                 |
+              v                 v
+        [SUCCESS]         [EXCEPTION]
+              |                 |
+              v                 v
+    +------------------+  +------------------+
+    | manager.commit() |  | manager.rollback()|
+    | State: TX = NONE |  | State: TX = NONE |
+    +------------------+  +------------------+
+              |                 |
+              v                 v
+      [RETURN SUCCESS]   [RETURN FAILURE]
+              |                 |
+              +--------+--------+
+                       |
+                       v
+                    [END]
+
+STATES:
+=======
+- NONE: No active transaction
+- OPEN: Transaction in progress
+
+TRANSITIONS:
+============
+begin()    : NONE -> OPEN
+commit()   : OPEN -> NONE
+rollback() : OPEN -> NONE
+
+DECISION POINTS:
+================
+1. Success vs Exception
+   - Success path: commit transaction
+   - Exception path: rollback transaction
+
+PATTERN:
+========
+try {
+    begin()
+    operations()
+    commit()
+    return success
+} catch (Exception) {
+    rollback()
+    return failure
+}

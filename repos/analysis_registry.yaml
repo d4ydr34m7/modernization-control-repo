@@ -7,3 +7,11 @@ repos:
   notes: 'Analysis completed (confidence: medium). Outputs: Documentation | Log confirms
     successful completion | Process exit code indicated error, but outputs confirm
     success'
+- repo_name: verafin-transform
+  git_url: https://github.com/d4ydr34m7/verafin-transform.git
+  language: unknown
+  analysis_status: analyzed
+  analysis_date: '2026-01-18T04:06:36.657808'
+  notes: 'Analysis completed (confidence: medium). Outputs: Documentation | Log confirms
+    successful completion | Process exit code indicated error, but outputs confirm
+    success'

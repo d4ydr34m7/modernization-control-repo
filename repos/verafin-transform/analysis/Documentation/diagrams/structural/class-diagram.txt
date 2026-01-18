@@ -1,0 +1,87 @@
+Class Diagram - transform-jdo-demo
+==================================
+
++-------------------------+
+| LegacyJdoManager        |
++-------------------------+
+| - state: Map            |
++-------------------------+
+| + executeQuery()        |
+| + executeUpdate()       |
+| + begin()               |
+| + commit()              |
+| + rollback()            |
++-------------------------+
+        ^         ^
+        |         |
+        |         +------------------+
+        |                            |
++-------+-------+         +----------+---------+
+| UserDao       |         | BillingService     |
++---------------+         +--------------------+
+| - manager     |         | - manager          |
++---------------+         +--------------------+
+| + findById()  |         | + createInvoice()  |
+| + updateEmail()|         +--------------------+
++---------------+
+        ^
+        |
+        |
++-------+-------+          +------------------+
+| UserService   |          | UserRecord       |
++---------------+          +------------------+
+| - dao         |<-------->| + id: String     |
+| - manager     |          | + email: String  |
++---------------+          | + status: String |
+| + changeEmail()|          +------------------+
++---------------+
+
++------------------+          +------------------+
+| LegacyQueries    |          | JdoPropertyKeys  |
++------------------+          +------------------+
+| (final, static)  |          | (final, static)  |
++------------------+          +------------------+
+| + findUserById() |          | + CONNECTION_USER|
+| + updateEmail()  |          | + CONNECTION_PWD |
+| + insertInvoice()|          | + CONNECTION_URL |
++------------------+          +------------------+
+        ^                            ^
+        |                            |
+        |                            |
++-------+-------+          +---------+---------+
+| UserDao       |          | LegacyDbConfig    |
++---------------+          +-------------------+
+| (uses queries)|          | (uses keys)       |
++---------------+          +-------------------+
+                           | + user()          |
+                           | + password()      |
+                           | + url()           |
+                           +-------------------+
+
++------------------+
+| UserServiceTest  |
++------------------+
+| (JUnit 5 test)   |
++------------------+
+| + changeEmail... |
++------------------+
+
+RELATIONSHIPS:
+==============
+- UserService     DEPENDS ON  UserDao
+- UserService     DEPENDS ON  LegacyJdoManager
+- UserDao         DEPENDS ON  LegacyJdoManager
+- UserDao         USES        LegacyQueries
+- UserDao         CREATES     UserRecord
+- BillingService  DEPENDS ON  LegacyJdoManager
+- BillingService  USES        LegacyQueries
+- LegacyDbConfig  USES        JdoPropertyKeys
+- UserServiceTest TESTS       UserService
+
+CLASS COUNT: 9 total (8 production, 1 test)
+
+DESIGN NOTES:
+- No inheritance hierarchy (composition only)
+- All dependencies through composition
+- Final utility classes (LegacyQueries, JdoPropertyKeys, LegacyDbConfig)
+- Immutable record (UserRecord)

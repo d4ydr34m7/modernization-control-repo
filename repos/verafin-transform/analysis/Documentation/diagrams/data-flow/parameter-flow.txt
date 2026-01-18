@@ -1,0 +1,61 @@
+Data Flow Diagram - Parameter Flow
+===================================
+
+SERVICE LAYER
+    |
+    | String userId = "u-123"
+    | String newEmail = "new@example.com"
+    |
+    v
+[UserDao.updateEmail(userId, newEmail)]
+    |
+    | Create HashMap
+    v
+PARAMETER MAP CONSTRUCTION
+    |
+    | Map<String, Object> params = new HashMap<>();
+    | params.put("id", userId);         <-- String
+    | params.put("email", newEmail);    <-- String
+    |
+    v
+PERSISTENCE LAYER
+    |
+    | SQL: "UPDATE users SET email = :email WHERE id = :id"
+    |
+    v
+[LegacyJdoManager.executeUpdate(sql, params)]
+    |
+    | Parameter binding:
+    | :id    <-- params.get("id")    = "u-123"
+    | :email <-- params.get("email") = "new@example.com"
+    |
+    v
+DATABASE EXECUTION
+    |
+    | UPDATE users SET email = 'new@example.com' WHERE id = 'u-123'
+    |
+    v
+RESULT
+    |
+    | int rowsAffected = 1
+    |
+    v
+[Return to Service]
+
+TYPE TRANSFORMATIONS:
+=====================
+1. Typed parameters (String, String)
+   |
+   v
+2. Type-erased Map (String -> Object)
+   |
+   v
+3. Named SQL parameters (:id, :email)
+   |
+   v
+4. Database values (bound at execution)
+   |
+   v
+5. Integer result (row count)
+
+ISSUE: Type safety lost in Map<String, Object>

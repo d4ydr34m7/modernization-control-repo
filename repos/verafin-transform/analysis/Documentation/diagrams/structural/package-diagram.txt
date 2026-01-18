@@ -1,0 +1,44 @@
+Package Diagram - transform-jdo-demo
+====================================
+
+com.transformtest.legacy
+    |
+    +-- jdo/                    (JDO Persistence Layer)
+    |   |
+    |   +-- LegacyJdoManager    (Core persistence manager)
+    |   +-- LegacyQueries       (SQL query repository)
+    |   +-- JdoPropertyKeys     (Configuration constants)
+    |
+    +-- user/                   (User Domain)
+    |   |
+    |   +-- UserRecord          (User data model)
+    |   +-- UserDao             (User data access)
+    |   +-- UserService         (User business logic)
+    |
+    +-- billing/                (Billing Domain)
+        |
+        +-- BillingService      (Billing business logic)
+
+com.acme.legacy                 (PACKAGE INCONSISTENCY!)
+    |
+    +-- config/                 (Configuration)
+        |
+        +-- LegacyDbConfig      (Database configuration)
+
+PACKAGE DEPENDENCIES:
+=====================
+user     --depends on--> jdo
+billing  --depends on--> jdo
+config   --depends on--> jdo (from com.acme.legacy)
+
+PACKAGE METRICS:
+================
+com.transformtest.legacy.jdo:     3 classes (37.5%)
+com.transformtest.legacy.user:    3 classes (37.5%)
+com.transformtest.legacy.billing: 1 class  (12.5%)
+com.acme.legacy.config:           1 class  (12.5%)
+
+ISSUES:
+=======
+1. Package root inconsistency: com.transformtest vs com.acme
+2. Config package should be under com.transformtest.legacy

@@ -1,0 +1,82 @@
+Sequence Diagram - Email Change Workflow
+=========================================
+
+Actor: Client
+Service: UserService
+DAO: UserDao
+Manager: LegacyJdoManager
+Database: PostgreSQL
+
+Client          UserService      UserDao      LegacyJdoManager    PostgreSQL
+  |                 |              |                |                 |
+  |--changeEmail--->|              |                |                 |
+  | (userId,email)  |              |                |                 |
+  |                 |              |                |                 |
+  |                 |--begin()---->|                |                 |
+  |                 |              |                |                 |
+  |                 |--findById--->|                |                 |
+  |                 | (userId)     |                |                 |
+  |                 |              |                |                 |
+  |                 |              |--executeQuery->|                 |
+  |                 |              | (SQL,params)   |                 |
+  |                 |              |                |                 |
+  |                 |              |                |----SELECT------>|
+  |                 |              |                |    users        |
+  |                 |              |                |<---result-------|
+  |                 |              |                |                 |
+  |                 |              |<--rows---------|                 |
+  |                 |              |  (List<Map>)   |                 |
+  |                 |              |                |                 |
+  |                 |<--UserRecord-|                |                 |
+  |                 |  (or null)   |                |                 |
+  |                 |              |                |                 |
+  |                 |--[if null]-------------------------------->     |
+  |<--false---------|              |                |          return |
+  |                 |              |                |                 |
+  |                 |--updateEmail>|                |                 |
+  |                 | (id,email)   |                |                 |
+  |                 |              |                |                 |
+  |                 |              |--executeUpdate>|                 |
+  |                 |              | (SQL,params)   |                 |
+  |                 |              |                |                 |
+  |                 |              |                |----UPDATE------>|
+  |                 |              |                |    users        |
+  |                 |              |                |<---rowcount-----|
+  |                 |              |                |                 |
+  |                 |              |<--rowcount-----|                 |
+  |                 |              |                |                 |
+  |                 |<--rowcount---|                |                 |
+  |                 |              |                |                 |
+  |                 |--commit()--->|                |                 |
+  |                 |              |                |                 |
+  |<--true/false----|              |                |                 |
+  |                 |              |                |                 |
+
+EXCEPTION PATH:
+---------------
+[Any Point]
+  |
+  |--[Exception]-------------------->|
+  |                 |                |
+  |                 |--rollback()--->|
+  |                 |                |
+  |<--false---------|                |
+
+STEPS:
+======
+1. Client calls changeEmail()
+2. UserService begins transaction
+3. UserService calls UserDao.findById()
+4. UserDao calls LegacyJdoManager.executeQuery()
+5. LegacyJdoManager queries database (SELECT)
+6. Result transforms to UserRecord
+7. If null, return false (user not found)
+8. UserService calls UserDao.updateEmail()
+9. UserDao calls LegacyJdoManager.executeUpdate()
+10. LegacyJdoManager updates database (UPDATE)
+11. UserService commits transaction
+12. Return success indicator (true/false)
+
+EXCEPTION: Any exception triggers rollback and returns false
+
+TOTAL STEPS: 7 main steps + exception handling

@@ -1,0 +1,90 @@
+Component Diagram - transform-jdo-demo
+=====================================
+
+                         SYSTEM BOUNDARY
+                      transform-jdo-demo
+
+  +--------------------------------------------------------------+
+  |                  BUSINESS LOGIC LAYER                        |
+  |                                                              |
+  |   +------------------+          +------------------+         |
+  |   |  UserService     |          |  BillingService  |         |
+  |   |                  |          |                  |         |
+  |   | + changeEmail()  |          | + createInvoice()|         |
+  |   +--------+---------+          +--------+---------+         |
+  |            |                             |                   |
+  +------------+-----------------------------+-------------------+
+               |                             |
+  +------------v-----------------------------v-------------------+
+  |                  DATA ACCESS LAYER                           |
+  |                                                              |
+  |   +------------------+                                       |
+  |   |    UserDao       |                                       |
+  |   |                  |                                       |
+  |   | + findById()     |                                       |
+  |   | + updateEmail()  |                                       |
+  |   +--------+---------+                                       |
+  |            |                                                 |
+  +------------+-------------------------------------------------+
+               |
+  +------------v-------------------------------------------------+
+  |              PERSISTENCE MANAGEMENT LAYER                    |
+  |                                                              |
+  |   +------------------------------------------------------+   |
+  |   |           LegacyJdoManager                           |   |
+  |   |                                                      |   |
+  |   | + executeQuery()                                    |   |
+  |   | + executeUpdate()                                   |   |
+  |   | + begin() / commit() / rollback()                   |   |
+  |   +--------------------+---------------------------------+   |
+  |                        |                                    |
+  +------------------------+-------------------------------------+
+                           |
+  +------------------------+-------------------------------------+
+  |              INFRASTRUCTURE LAYER                           |
+  |                        |                                    |
+  |   +----------------+   |   +--------------+  +-----------+  |
+  |   | LegacyQueries  |<--+   |LegacyDbConfig|  |JdoPropKeys|  |
+  |   | SQL strings    |       |credentials   |  |constants  |  |
+  |   +----------------+       +--------------+  +-----------+  |
+  |                                                             |
+  +-------------------------------------------------------------+
+
+  +-------------------------------------------------------------+
+  |                    TEST SUITE                               |
+  |                                                             |
+  |   +------------------+                                      |
+  |   | UserServiceTest  |                                      |
+  |   | JUnit 5          |                                      |
+  |   +------------------+                                      |
+  |                                                             |
+  +-------------------------------------------------------------+
+
+                           |
+                           | JDBC Protocol
+                           v
+              +--------------------------+
+              |    PostgreSQL Database   |
+              |                          |
+              |  Tables:                 |
+              |  - users                 |
+              |  - invoices              |
+              +--------------------------+
+
+LEGEND:
+-------
++--+ Component box
+ |   Dependency (uses/calls)
+ v   Direction flow
+
+COMPONENT COUNT: 5
+- Business Logic: 2 (UserService, BillingService)
+- Data Access: 1 (UserDao)
+- Persistence: 1 (LegacyJdoManager)
+- Infrastructure: 3 (LegacyQueries, LegacyDbConfig, JdoPropertyKeys)
+- Testing: 1 (UserServiceTest)
+
+CRITICAL DEPENDENCIES:
+- UserService -> UserDao -> LegacyJdoManager
+- BillingService -> LegacyJdoManager (bypasses DAO)
+- All services -> LegacyJdoManager for transactions

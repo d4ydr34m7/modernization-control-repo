@@ -1,0 +1,54 @@
+Sequence Diagram - Invoice Creation Workflow
+============================================
+
+Actor: Client
+Service: BillingService
+Manager: LegacyJdoManager
+Database: PostgreSQL
+
+Client       BillingService   LegacyJdoManager    PostgreSQL
+  |                |                  |                 |
+  |--createInvoice>|                  |                 |
+  | (id,uid,amt)   |                  |                 |
+  |                |                  |                 |
+  |                |--begin()-------->|                 |
+  |                |                  |                 |
+  |                |--executeUpdate-->|                 |
+  |                | (SQL,params)     |                 |
+  |                |                  |                 |
+  |                |                  |----INSERT------>|
+  |                |                  |   invoices      |
+  |                |                  |<---rowcount-----|
+  |                |                  |                 |
+  |                |<--rowcount-------|                 |
+  |                |                  |                 |
+  |                |--commit()------->|                 |
+  |                |                  |                 |
+  |<--rowcount-----|                  |                 |
+  |                |                  |                 |
+
+EXCEPTION PATH:
+---------------
+[Any Point]
+  |
+  |--[Exception]---------------------->|
+  |                |                   |
+  |                |--rollback()------>|
+  |                |                   |
+  |<--0 (failure)--|                   |
+
+STEPS:
+======
+1. Client calls createInvoice()
+2. BillingService begins transaction
+3. BillingService creates parameter map (id, userId, amount)
+4. BillingService calls LegacyJdoManager.executeUpdate()
+5. LegacyJdoManager inserts into database (INSERT)
+6. BillingService commits transaction
+7. Return row count (1 = success, 0 = failure)
+
+EXCEPTION: Any exception triggers rollback and returns 0
+
+TOTAL STEPS: 5 main steps + exception handling
+
+NOTE: No validation - relies on database constraints

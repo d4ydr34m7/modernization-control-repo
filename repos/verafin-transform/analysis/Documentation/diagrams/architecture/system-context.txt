@@ -1,0 +1,69 @@
+System Context Diagram
+======================
+
+            +----------------------------------+
+            |         EXTERNAL ACTORS          |
+            |                                  |
+            |  +--------------------------+    |
+            |  |   Application Layer      |    |
+            |  |   (External Consumer)    |    |
+            |  +--------------------------+    |
+            +----------------+-----------------+
+                             |
+                             | API Calls
+                             | (Java method calls)
+                             v
++------------------------------------------------------------------+
+|                     SYSTEM BOUNDARY                              |
+|                  transform-jdo-demo                              |
+|                                                                  |
+|  +---------------------------+  +---------------------------+    |
+|  |     UserService           |  |    BillingService         |    |
+|  |  - changeEmail()          |  |  - createInvoice()        |    |
+|  +---------------------------+  +---------------------------+    |
+|               |                              |                   |
+|               +-------------+----------------+                   |
+|                             |                                    |
+|  +---------------------------v---------------------------+       |
+|  |              LegacyJdoManager                         |       |
+|  |  (Transaction & Query Management)                     |       |
+|  +-------------------------------------------------------+       |
+|                             |                                    |
++-----------------------------+------------------------------------+
+                              |
+                              | JDBC Protocol
+                              | (jdbc:postgresql://...)
+                              v
+            +----------------------------------+
+            |     EXTERNAL SYSTEMS             |
+            |                                  |
+            |  +--------------------------+    |
+            |  |  PostgreSQL Database     |    |
+            |  |  - users table           |    |
+            |  |  - invoices table        |    |
+            |  +--------------------------+    |
+            +----------------------------------+
+
+EXTERNAL INTERFACES:
+====================
+1. API Interface (Inbound)
+   - Type: Java method calls
+   - Consumer: Application layer
+   - Methods: changeEmail(), createInvoice()
+
+2. Database Interface (Outbound)
+   - Protocol: JDBC
+   - Database: PostgreSQL
+   - Connection: jdbc:postgresql://localhost:5432/legacy
+   - Authentication: Username/Password via system properties
+
+SYSTEM BOUNDARIES:
+==================
+- Inside: Java application (UserService, BillingService, LegacyJdoManager)
+- Outside: Application consumers, Database server
+
+DATA FLOWS:
+===========
+IN:  API requests (userId, email, amount, etc.)
+OUT: Success/failure indicators (boolean, int)
+DB:  SQL queries (SELECT, UPDATE, INSERT)

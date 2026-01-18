@@ -1,0 +1,85 @@
+Deployment View Diagram
+=======================
+
+DEPLOYMENT ENVIRONMENT: Single JVM Process
+
++---------------------------------------------------------------+
+|                      JVM PROCESS                              |
+|                                                               |
+|  +--------------------------------------------------------+   |
+|  |              transform-jdo-demo.jar                    |   |
+|  |           (Single Module Deployment)                   |   |
+|  |                                                        |   |
+|  |  +--------------------------------------------------+  |   |
+|  |  |  Application Classes                             |  |   |
+|  |  |                                                  |  |   |
+|  |  |  - UserService.class                            |  |   |
+|  |  |  - BillingService.class                         |  |   |
+|  |  |  - UserDao.class                                |  |   |
+|  |  |  - LegacyJdoManager.class                       |  |   |
+|  |  |  - UserRecord.class                             |  |   |
+|  |  |  - LegacyQueries.class                          |  |   |
+|  |  |  - LegacyDbConfig.class                         |  |   |
+|  |  |  - JdoPropertyKeys.class                        |  |   |
+|  |  +--------------------------------------------------+  |   |
+|  |                                                        |   |
+|  |  +--------------------------------------------------+  |   |
+|  |  |  External Libraries                              |  |   |
+|  |  |                                                  |  |   |
+|  |  |  - javax.jdo:jdo-api:3.1                        |  |   |
+|  |  |  - com.google.guava:guava:33.0.0-jre            |  |   |
+|  |  +--------------------------------------------------+  |   |
+|  |                                                        |   |
+|  +--------------------------------------------------------+   |
+|                                                               |
+|  +--------------------------------------------------------+   |
+|  |  System Properties (Configuration)                     |   |
+|  |                                                        |   |
+|  |  - javax.jdo.option.ConnectionUserName = "legacy_user"|   |
+|  |  - javax.jdo.option.ConnectionPassword = "legacy_pwd" |   |
+|  |  - javax.jdo.option.ConnectionURL = "jdbc:..."        |   |
+|  +--------------------------------------------------------+   |
+|                                                               |
++-------------------------------+-------------------------------+
+                                |
+                                | JDBC Connection
+                                | Network: TCP/IP
+                                | Port: 5432
+                                v
+                  +-----------------------------+
+                  |   PostgreSQL Database       |
+                  |   Hostname: localhost       |
+                  |   Port: 5432                |
+                  |   Database: legacy          |
+                  |                             |
+                  |   Tables:                   |
+                  |   - users                   |
+                  |   - invoices                |
+                  +-----------------------------+
+
+DEPLOYMENT CHARACTERISTICS:
+===========================
+Module Structure:  Single JAR (monolithic)
+Runtime:           Java 11 JVM
+Memory:            Heap size depends on JVM settings
+Threads:           Single or multi-threaded (not specified)
+Configuration:     System properties (not externalized)
+Database Driver:   PostgreSQL JDBC (implied)
+
+DEPLOYMENT TOPOLOGY:
+====================
+Tier 1: Application (JVM Process)
+Tier 2: Database (PostgreSQL Server)
+
+CONNECTION:
+===========
+- Protocol: JDBC over TCP/IP
+- Port: 5432 (PostgreSQL default)
+- Authentication: Username/Password
+- Connection Pooling: Not implemented
+
+SCALABILITY:
+============
+- Horizontal: Requires external load balancer
+- Vertical: Limited by JVM heap size
+- Database: Single instance (no clustering)
